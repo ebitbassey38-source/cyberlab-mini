@@ -1,6 +1,8 @@
 var API = 'https://cyberlab-mini.onrender.com';
 var currentScanType = 'full';
 var currentAlgo = 'sha256';
+var lastFindings = [];
+var lastTarget = '';
 
 function switchTab(name) {
   document.querySelectorAll('.tab-content').forEach(function(t) { t.classList.remove('active'); });
@@ -35,7 +37,7 @@ function loading(id) {
 }
 
 function aiBox(text) {
-  return '<div class="ai-box"><div class="ai-box-header">⚡ AI Analysis</div><div class="ai-box-body">' + text + '</div></div>';
+  return '<div class="ai-box"><div class="ai-box-header">AI Analysis</div><div class="ai-box-body">' + text + '</div></div>';
 }
 
 function badge(s) { return '<span class="badge badge-' + s + '">' + s + '</span>'; }
@@ -53,26 +55,75 @@ function post(path, body) {
   }).then(function(r) { return r.json(); });
 }
 
+function showFixGuide(idx) {
+  var f = lastFindings[idx];
+  if (!f) return;
+  var platforms = ['WordPress','Nginx','Apache','cPanel','Node.js','PHP','Django','Laravel'];
+  var btns = platforms.map(function(p) {
+    return '<button onclick="getFix(' + idx + ',\'' + p + '\')" style="padding:6px 12px;border:1px solid #1e2d40;border-radius:6px;background:#111827;color:#9ca3af;font-size:12px;cursor:pointer;margin:3px">' + p + '</button>';
+  }).join('');
+
+  var el = document.createElement('div');
+  el.id = 'fix-modal';
+  el.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:9999;overflow-y:auto;padding:16px';
+  el.innerHTML = '<div style="background:#111827;border:1px solid #1e2d40;border-radius:12px;max-width:700px;margin:0 auto">' +
+    '<div style="background:#00d4ff15;border-bottom:1px solid #00d4ff22;padding:14px 16px;display:flex;justify-content:space-between;align-items:center">' +
+    '<span style="color:#00d4ff;font-weight:700;font-size:13px">Fix Guide: ' + f.type + '</span>' +
+    '<button onclick="document.getElementById(\'fix-modal\').remove()" style="background:none;border:none;color:#fff;font-size:22px;cursor:pointer;line-height:1">x</button>' +
+    '</div>' +
+    '<div style="padding:16px">' +
+    '<p style="color:#9ca3af;font-size:13px;margin-bottom:10px">Select your platform:</p>' +
+    '<div style="margin-bottom:14px">' + btns + '</div>' +
+    '<div id="fix-content"><p style="color:#4b5563;font-size:13px">Select a platform above.</p></div>' +
+    '</div></div>';
+  document.body.appendChild(el);
+}
+
+function getFix(idx, platform) {
+  var f = lastFindings[idx];
+  var content = document.getElementById('fix-content');
+  content.innerHTML = '<div class="loading"><div class="spinner"></div>Generating fix for ' + platform + '...</div>';
+  post('/api/fixguide/generate', { vulnerability: f, platform: platform, target: lastTarget })
+    .then(function(data) {
+      content.innerHTML = '<div style="background:#070d1a;border:1px solid #1e2d40;border-radius:8px;padding:14px"><pre style="color:#c9d6e3;font-size:12px;line-height:1.7;white-space:pre-wrap;word-break:break-word;font-family:monospace;margin:0">' + data.fix + '</pre></div>';
+    })
+    .catch(function(e) { content.innerHTML = '<p style="color:#ef4444">Error: ' + e.message + '</p>'; });
+}
+
 function runVulnScan() {
   var target = document.getElementById('vuln-target').value.trim();
   if (!target) { alert('Enter a target URL'); return; }
   loading('vuln-results');
+  lastTarget = target;
   post('/api/scan/vuln', { target: target, scanType: currentScanType })
     .then(function(data) {
+      lastFindings = data.findings;
       var html = '<p style="color:#6b7280;font-size:12px;margin-bottom:12px">' + data.findings.length + ' findings</p>';
-      data.findings.forEach(function(f) {
+      data.findings.forEach(function(f, i) {
         html += '<div class="finding" style="border-left:3px solid ' + severityColor(f.severity) + '">';
         html += '<div class="finding-header">' + badge(f.severity) + ' <strong>' + f.type + '</strong></div>';
         html += '<div class="finding-detail">' + f.detail + '</div>';
-        html += '<div class="finding-vector">Vector: ' + f.vector + '</div><button onclick="showFixGuide(' + JSON.stringify(f) + ', '' + data.target + '')" style="margin-top:8px;padding:5px 12px;background:#00d4ff15;border:1px solid #00d4ff44;border-radius:6px;color:#00d4ff;font-size:11px;font-weight:600;cursor:pointer">🔧 How to Fix</button></div>';
+        html += '<div class="finding-vector">Vector: ' + f.vector + '</div>';
+        html += '<button onclick="showFixGuide(' + i + ')" style="margin-top:8px;padding:5px 12px;background:#00d4ff15;border:1px solid #00d4ff44;border-radius:6px;color:#00d4ff;font-size:11px;font-weight:600;cursor:pointer">Fix Guide</button>';
+        html += '</div>';
       });
       html += aiBox(data.aiAnalysis);
-      window.lastFindings = data.findings;
       document.getElementById('report-btn').style.display = 'block';
       show('vuln-results', html);
-      document.getElementById('report-output').style.display = 'none';
     })
     .catch(function(e) { show('vuln-results', '<p style="color:#ef4444">Error: ' + e.message + '</p>'); });
+}
+
+function generateReport() {
+  if (!lastTarget || lastFindings.length === 0) { alert('Run a scan first'); return; }
+  var reportDiv = document.getElementById('report-output');
+  reportDiv.innerHTML = '<div class="loading"><div class="spinner"></div>Generating HackerOne report...</div>';
+  reportDiv.style.display = 'block';
+  post('/api/report/generate', { target: lastTarget, findings: lastFindings })
+    .then(function(data) {
+      reportDiv.innerHTML = '<div class="ai-box"><div class="ai-box-header">HackerOne Report</div><div class="ai-box-body">' + data.report + '</div></div>';
+    })
+    .catch(function(e) { reportDiv.innerHTML = '<p style="color:#ef4444">Error: ' + e.message + '</p>'; });
 }
 
 function runHashIdentify() {
@@ -118,7 +169,7 @@ function runStrength() {
       html += '<span style="color:#6b7280">' + data.score + '/7</span></div>';
       html += '<div class="strength-bar"><div class="strength-fill" style="width:' + pct + '%;background:' + color + '"></div></div>';
       data.checks.forEach(function(c) {
-        html += '<div class="check-row"><span class="' + (c.pass ? 'check-pass' : 'check-fail') + '">' + (c.pass ? '✓' : '○') + '</span>';
+        html += '<div class="check-row"><span class="' + (c.pass ? 'check-pass' : 'check-fail') + '">' + (c.pass ? 'v' : 'o') + '</span>';
         html += '<span style="color:' + (c.pass ? '#d1d5db' : '#6b7280') + '">' + c.label + '</span></div>';
       });
       html += '</div>' + aiBox(data.aiAnalysis);
@@ -139,7 +190,7 @@ function runNetwork() {
       });
       var hdrs = '';
       data.headers.forEach(function(h) {
-        hdrs += '<div class="header-row"><span class="header-name">' + h.name + '</span><span class="' + (h.risk==='safe'?'header-safe':'header-warn') + '">' + h.value + '</span></div>';
+        hdrs += '<div class="header-row"><span class="header-name">' + h.name + '</span><span class="' + (h.risk === 'safe' ? 'header-safe' : 'header-warn') + '">' + h.value + '</span></div>';
       });
       var ports = '';
       data.ports.forEach(function(p) {
@@ -155,26 +206,7 @@ function runNetwork() {
     })
     .catch(function(e) { show('network-results', '<p style="color:#ef4444">Error: ' + e.message + '</p>'); });
 }
-/* v2 */
 
-function generateReport() {
-  var target = document.getElementById('vuln-target').value.trim();
-  var resultsDiv = document.getElementById('vuln-results');
-  if (!target) { alert('Run a scan first'); return; }
-  if (!window.lastFindings || window.lastFindings.length === 0) { alert('Run a scan first to get findings'); return; }
-
-  var reportDiv = document.getElementById('report-output');
-  reportDiv.innerHTML = '<div class="loading"><div class="spinner"></div>Generating HackerOne report with AI...</div>';
-  reportDiv.style.display = 'block';
-
-  post('/api/report/generate', { target: target, findings: window.lastFindings })
-    .then(function(data) {
-      reportDiv.innerHTML = '<div class="ai-box"><div class="ai-box-header">📋 HackerOne Report</div><div class="ai-box-body">' + data.report + '</div></div>';
-    })
-    .catch(function(e) {
-      reportDiv.innerHTML = '<p style="color:#ef4444">Error: ' + e.message + '</p>';
-    });
-}
 function runTakeover() {
   var target = document.getElementById('takeover-target').value.trim();
   if (!target) { alert('Enter a domain'); return; }
@@ -204,6 +236,7 @@ function runTakeover() {
     })
     .catch(function(e) { show('takeover-results', '<p style="color:#ef4444">Error: ' + e.message + '</p>'); });
 }
+
 function runApiVuln() {
   var target = document.getElementById('apivuln-target').value.trim();
   if (!target) { alert('Enter a target URL'); return; }
@@ -212,7 +245,7 @@ function runApiVuln() {
     .then(function(data) {
       var html = '<div class="card" style="margin-bottom:12px"><div style="display:flex;gap:16px;flex-wrap:wrap">';
       html += '<div><div class="grid-label">Paths Checked</div><div class="grid-value" style="color:#00d4ff">' + data.total + '</div></div>';
-      html += '<div><div class="grid-label">Endpoints Found</div><div class="grid-value" style="color:#f59e0b">' + data.found + '</div></div>';
+      html += '<div><div class="grid-label">Found</div><div class="grid-value" style="color:#f59e0b">' + data.found + '</div></div>';
       html += '<div><div class="grid-label">Vulnerable</div><div class="grid-value" style="color:' + (data.vulnerable > 0 ? '#ef4444' : '#22c55e') + '">' + data.vulnerable + '</div></div>';
       html += '</div></div>';
       if (data.results.length > 0) {
@@ -220,59 +253,16 @@ function runApiVuln() {
           var color = r.vulnerable ? (r.severity === 'critical' ? '#dc2626' : r.severity === 'high' ? '#ea580c' : '#d97706') : '#2563eb';
           var label = r.vulnerable ? r.severity.toUpperCase() : r.status.toString();
           html += '<div class="finding" style="border-left:3px solid ' + color + '">';
-          html += '<div class="finding-header"><span class="badge" style="background:' + color + '22;color:' + color + ';border:1px solid ' + color + '">' + label + '</span>';
-          html += '<strong>' + r.path + '</strong></div>';
+          html += '<div class="finding-header"><span class="badge" style="background:' + color + '22;color:' + color + ';border:1px solid ' + color + '">' + label + '</span><strong>' + r.path + '</strong></div>';
           if (r.issue) html += '<div class="finding-detail">' + r.issue + '</div>';
-          html += '<div class="finding-vector">Status: ' + r.status + ' · ' + r.url + '</div>';
+          html += '<div class="finding-vector">Status: ' + r.status + '</div>';
           html += '</div>';
         });
       } else {
-        html += '<div class="card"><p style="color:#6b7280;font-size:13px">No exposed API endpoints found. Try a different target.</p></div>';
+        html += '<div class="card"><p style="color:#6b7280;font-size:13px">No exposed API endpoints found.</p></div>';
       }
       html += aiBox(data.aiAnalysis);
       show('apivuln-results', html);
     })
     .catch(function(e) { show('apivuln-results', '<p style="color:#ef4444">Error: ' + e.message + '</p>'); });
-}
-
-function showFixGuide(vulnerability, target) {
-  var platforms = ['WordPress', 'Nginx', 'Apache', 'cPanel', 'Node.js', 'PHP', 'Django', 'Laravel'];
-  var platformOptions = platforms.map(function(p) {
-    return '<button onclick="getFix(' + JSON.stringify(vulnerability) + ', \'' + p + '\', \'' + target + '\', this)" style="padding:6px 12px;border:1px solid #1e2d40;border-radius:6px;background:#111827;color:#9ca3af;font-size:12px;cursor:pointer;margin:3px;transition:all 0.15s">' + p + '</button>';
-  }).join('');
-
-  var modal = document.createElement('div');
-  modal.id = 'fix-modal';
-  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:1000;display:flex;align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto';
-  modal.innerHTML = '<div style="background:#111827;border:1px solid #1e2d40;border-radius:12px;width:100%;max-width:700px;overflow:hidden">' +
-    '<div style="background:#00d4ff15;border-bottom:1px solid #00d4ff22;padding:14px 16px;display:flex;justify-content:space-between;align-items:center">' +
-    '<span style="color:#00d4ff;font-weight:700;font-size:14px">🔧 Fix Guide — ' + vulnerability.type + '</span>' +
-    '<button onclick="document.getElementById(\'fix-modal\').remove()" style="background:none;border:none;color:#6b7280;font-size:20px;cursor:pointer">×</button>' +
-    '</div>' +
-    '<div style="padding:16px">' +
-    '<p style="color:#9ca3af;font-size:13px;margin-bottom:12px">Select your platform to get exact fix instructions:</p>' +
-    '<div style="margin-bottom:16px">' + platformOptions + '</div>' +
-    '<div id="fix-content"><p style="color:#4b5563;font-size:13px">Select a platform above to generate fix instructions.</p></div>' +
-    '</div></div>';
-  document.body.appendChild(modal);
-}
-
-function getFix(vulnerability, platform, target, btn) {
-  document.querySelectorAll('#fix-modal button').forEach(function(b) {
-    b.style.background = '#111827'; b.style.color = '#9ca3af'; b.style.borderColor = '#1e2d40';
-  });
-  btn.style.background = '#00d4ff15'; btn.style.color = '#00d4ff'; btn.style.borderColor = '#00d4ff';
-
-  var content = document.getElementById('fix-content');
-  content.innerHTML = '<div class="loading"><div class="spinner"></div>Generating fix for ' + platform + '...</div>';
-
-  post('/api/fixguide/generate', { vulnerability: vulnerability, platform: platform, target: target })
-    .then(function(data) {
-      content.innerHTML = '<div style="background:#070d1a;border:1px solid #1e2d40;border-radius:8px;padding:14px">' +
-        '<pre style="color:#c9d6e3;font-size:12px;line-height:1.7;white-space:pre-wrap;word-break:break-word;font-family:monospace;margin:0">' + data.fix + '</pre>' +
-        '</div>';
-    })
-    .catch(function(e) {
-      content.innerHTML = '<p style="color:#ef4444">Error: ' + e.message + '</p>';
-    });
 }
