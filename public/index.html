@@ -28,6 +28,7 @@
     <button class="tab active" id="tab-btn-vuln" onclick="switchTab('vuln')">🔍 Vuln Scanner</button>
     <button class="tab" id="tab-btn-hash" onclick="switchTab('hash')">🔐 Hash Tools</button>
     <button class="tab" id="tab-btn-network" onclick="switchTab('network')">🌐 Network Recon</button>
+    <button class="tab" id="tab-btn-takeover" onclick="switchTab('takeover')">💀 Takeover</button>
   </div>
 
   <main class="main">
@@ -105,6 +106,14 @@
       <div id="network-results"></div>
     </section>
 
+    <section id="tab-takeover" class="tab-content">
+      <div class="form-group">
+        <label>Target Domain</label>
+        <input type="text" id="takeover-target" placeholder="example.com"/>
+      </div>
+      <button class="btn-primary" onclick="runTakeover()">💀 Check Subdomain Takeover</button>
+      <div id="takeover-results"></div>
+    </section>
   </main>
   <script src="app.js"></script>
 </body>

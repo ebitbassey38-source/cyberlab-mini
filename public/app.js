@@ -175,3 +175,32 @@ function generateReport() {
       reportDiv.innerHTML = '<p style="color:#ef4444">Error: ' + e.message + '</p>';
     });
 }
+function runTakeover() {
+  var target = document.getElementById('takeover-target').value.trim();
+  if (!target) { alert('Enter a domain'); return; }
+  loading('takeover-results');
+  post('/api/takeover/check', { target: target })
+    .then(function(data) {
+      var html = '<div class="card" style="margin-bottom:12px"><div style="display:flex;gap:16px;flex-wrap:wrap">';
+      html += '<div><div class="grid-label">Checked</div><div class="grid-value" style="color:#00d4ff">' + data.total + '</div></div>';
+      html += '<div><div class="grid-label">Found</div><div class="grid-value" style="color:#f59e0b">' + data.found + '</div></div>';
+      html += '<div><div class="grid-label">Vulnerable</div><div class="grid-value" style="color:' + (data.vulnerable > 0 ? '#ef4444' : '#22c55e') + '">' + data.vulnerable + '</div></div>';
+      html += '</div></div>';
+      if (data.results.length > 0) {
+        data.results.forEach(function(r) {
+          var color = r.vulnerable ? '#dc2626' : r.status === 'active' ? '#16a34a' : '#d97706';
+          var label = r.vulnerable ? 'VULNERABLE' : r.status === 'active' ? 'ACTIVE' : r.status.toUpperCase();
+          html += '<div class="finding" style="border-left:3px solid ' + color + '">';
+          html += '<div class="finding-header"><span class="badge" style="background:' + color + '22;color:' + color + ';border:1px solid ' + color + '">' + label + '</span><strong>' + r.subdomain + '</strong></div>';
+          if (r.vulnerable) html += '<div class="finding-detail">Vulnerable to takeover via ' + r.service + '</div>';
+          if (r.cname) html += '<div class="finding-vector">CNAME: ' + r.cname + '</div>';
+          html += '</div>';
+        });
+      } else {
+        html += '<div class="card"><p style="color:#6b7280;font-size:13px">No active subdomains found.</p></div>';
+      }
+      html += aiBox(data.aiAnalysis);
+      show('takeover-results', html);
+    })
+    .catch(function(e) { show('takeover-results', '<p style="color:#ef4444">Error: ' + e.message + '</p>'); });
+}
