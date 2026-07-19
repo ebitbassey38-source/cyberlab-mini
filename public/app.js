@@ -1,4 +1,4 @@
-var API = 'http://localhost:3000';
+var API = 'https://cyberlab-mini.onrender.com';
 var currentScanType = 'full';
 var currentAlgo = 'sha256';
 
