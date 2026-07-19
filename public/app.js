@@ -64,7 +64,7 @@ function runVulnScan() {
         html += '<div class="finding" style="border-left:3px solid ' + severityColor(f.severity) + '">';
         html += '<div class="finding-header">' + badge(f.severity) + ' <strong>' + f.type + '</strong></div>';
         html += '<div class="finding-detail">' + f.detail + '</div>';
-        html += '<div class="finding-vector">Vector: ' + f.vector + '</div></div>';
+        html += '<div class="finding-vector">Vector: ' + f.vector + '</div><button onclick="showFixGuide(' + JSON.stringify(f) + ', '' + data.target + '')" style="margin-top:8px;padding:5px 12px;background:#00d4ff15;border:1px solid #00d4ff44;border-radius:6px;color:#00d4ff;font-size:11px;font-weight:600;cursor:pointer">🔧 How to Fix</button></div>';
       });
       html += aiBox(data.aiAnalysis);
       window.lastFindings = data.findings;
@@ -233,4 +233,46 @@ function runApiVuln() {
       show('apivuln-results', html);
     })
     .catch(function(e) { show('apivuln-results', '<p style="color:#ef4444">Error: ' + e.message + '</p>'); });
+}
+
+function showFixGuide(vulnerability, target) {
+  var platforms = ['WordPress', 'Nginx', 'Apache', 'cPanel', 'Node.js', 'PHP', 'Django', 'Laravel'];
+  var platformOptions = platforms.map(function(p) {
+    return '<button onclick="getFix(' + JSON.stringify(vulnerability) + ', \'' + p + '\', \'' + target + '\', this)" style="padding:6px 12px;border:1px solid #1e2d40;border-radius:6px;background:#111827;color:#9ca3af;font-size:12px;cursor:pointer;margin:3px;transition:all 0.15s">' + p + '</button>';
+  }).join('');
+
+  var modal = document.createElement('div');
+  modal.id = 'fix-modal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:1000;display:flex;align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto';
+  modal.innerHTML = '<div style="background:#111827;border:1px solid #1e2d40;border-radius:12px;width:100%;max-width:700px;overflow:hidden">' +
+    '<div style="background:#00d4ff15;border-bottom:1px solid #00d4ff22;padding:14px 16px;display:flex;justify-content:space-between;align-items:center">' +
+    '<span style="color:#00d4ff;font-weight:700;font-size:14px">🔧 Fix Guide — ' + vulnerability.type + '</span>' +
+    '<button onclick="document.getElementById(\'fix-modal\').remove()" style="background:none;border:none;color:#6b7280;font-size:20px;cursor:pointer">×</button>' +
+    '</div>' +
+    '<div style="padding:16px">' +
+    '<p style="color:#9ca3af;font-size:13px;margin-bottom:12px">Select your platform to get exact fix instructions:</p>' +
+    '<div style="margin-bottom:16px">' + platformOptions + '</div>' +
+    '<div id="fix-content"><p style="color:#4b5563;font-size:13px">Select a platform above to generate fix instructions.</p></div>' +
+    '</div></div>';
+  document.body.appendChild(modal);
+}
+
+function getFix(vulnerability, platform, target, btn) {
+  document.querySelectorAll('#fix-modal button').forEach(function(b) {
+    b.style.background = '#111827'; b.style.color = '#9ca3af'; b.style.borderColor = '#1e2d40';
+  });
+  btn.style.background = '#00d4ff15'; btn.style.color = '#00d4ff'; btn.style.borderColor = '#00d4ff';
+
+  var content = document.getElementById('fix-content');
+  content.innerHTML = '<div class="loading"><div class="spinner"></div>Generating fix for ' + platform + '...</div>';
+
+  post('/api/fixguide/generate', { vulnerability: vulnerability, platform: platform, target: target })
+    .then(function(data) {
+      content.innerHTML = '<div style="background:#070d1a;border:1px solid #1e2d40;border-radius:8px;padding:14px">' +
+        '<pre style="color:#c9d6e3;font-size:12px;line-height:1.7;white-space:pre-wrap;word-break:break-word;font-family:monospace;margin:0">' + data.fix + '</pre>' +
+        '</div>';
+    })
+    .catch(function(e) {
+      content.innerHTML = '<p style="color:#ef4444">Error: ' + e.message + '</p>';
+    });
 }

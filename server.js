@@ -21,6 +21,7 @@ app.use('/api/network', require('./routes/network'));
 app.use('/api/report', require('./routes/report'));
 app.use('/api/takeover', require('./routes/takeover'));
 app.use('/api/apivuln', require('./routes/apivuln'));
+app.use('/api/fixguide', require('./routes/fixguide'));
 
 app.get('/api/health', (req, res) => {
   res.json({
