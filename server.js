@@ -18,6 +18,7 @@ app.use(express.static('public'));
 app.use('/api/scan', require('./routes/scan'));
 app.use('/api/hash', require('./routes/hash'));
 app.use('/api/network', require('./routes/network'));
+app.use('/api/report', require('./routes/report'));
 
 app.get('/api/health', (req, res) => {
   res.json({

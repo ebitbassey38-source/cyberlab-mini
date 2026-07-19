@@ -67,7 +67,10 @@ function runVulnScan() {
         html += '<div class="finding-vector">Vector: ' + f.vector + '</div></div>';
       });
       html += aiBox(data.aiAnalysis);
+      window.lastFindings = data.findings;
+      document.getElementById('report-btn').style.display = 'block';
       show('vuln-results', html);
+      document.getElementById('report-output').style.display = 'none';
     })
     .catch(function(e) { show('vuln-results', '<p style="color:#ef4444">Error: ' + e.message + '</p>'); });
 }
@@ -153,3 +156,22 @@ function runNetwork() {
     .catch(function(e) { show('network-results', '<p style="color:#ef4444">Error: ' + e.message + '</p>'); });
 }
 /* v2 */
+
+function generateReport() {
+  var target = document.getElementById('vuln-target').value.trim();
+  var resultsDiv = document.getElementById('vuln-results');
+  if (!target) { alert('Run a scan first'); return; }
+  if (!window.lastFindings || window.lastFindings.length === 0) { alert('Run a scan first to get findings'); return; }
+
+  var reportDiv = document.getElementById('report-output');
+  reportDiv.innerHTML = '<div class="loading"><div class="spinner"></div>Generating HackerOne report with AI...</div>';
+  reportDiv.style.display = 'block';
+
+  post('/api/report/generate', { target: target, findings: window.lastFindings })
+    .then(function(data) {
+      reportDiv.innerHTML = '<div class="ai-box"><div class="ai-box-header">📋 HackerOne Report</div><div class="ai-box-body">' + data.report + '</div></div>';
+    })
+    .catch(function(e) {
+      reportDiv.innerHTML = '<p style="color:#ef4444">Error: ' + e.message + '</p>';
+    });
+}
