@@ -204,3 +204,33 @@ function runTakeover() {
     })
     .catch(function(e) { show('takeover-results', '<p style="color:#ef4444">Error: ' + e.message + '</p>'); });
 }
+function runApiVuln() {
+  var target = document.getElementById('apivuln-target').value.trim();
+  if (!target) { alert('Enter a target URL'); return; }
+  loading('apivuln-results');
+  post('/api/apivuln/scan', { target: target })
+    .then(function(data) {
+      var html = '<div class="card" style="margin-bottom:12px"><div style="display:flex;gap:16px;flex-wrap:wrap">';
+      html += '<div><div class="grid-label">Paths Checked</div><div class="grid-value" style="color:#00d4ff">' + data.total + '</div></div>';
+      html += '<div><div class="grid-label">Endpoints Found</div><div class="grid-value" style="color:#f59e0b">' + data.found + '</div></div>';
+      html += '<div><div class="grid-label">Vulnerable</div><div class="grid-value" style="color:' + (data.vulnerable > 0 ? '#ef4444' : '#22c55e') + '">' + data.vulnerable + '</div></div>';
+      html += '</div></div>';
+      if (data.results.length > 0) {
+        data.results.forEach(function(r) {
+          var color = r.vulnerable ? (r.severity === 'critical' ? '#dc2626' : r.severity === 'high' ? '#ea580c' : '#d97706') : '#2563eb';
+          var label = r.vulnerable ? r.severity.toUpperCase() : r.status.toString();
+          html += '<div class="finding" style="border-left:3px solid ' + color + '">';
+          html += '<div class="finding-header"><span class="badge" style="background:' + color + '22;color:' + color + ';border:1px solid ' + color + '">' + label + '</span>';
+          html += '<strong>' + r.path + '</strong></div>';
+          if (r.issue) html += '<div class="finding-detail">' + r.issue + '</div>';
+          html += '<div class="finding-vector">Status: ' + r.status + ' · ' + r.url + '</div>';
+          html += '</div>';
+        });
+      } else {
+        html += '<div class="card"><p style="color:#6b7280;font-size:13px">No exposed API endpoints found. Try a different target.</p></div>';
+      }
+      html += aiBox(data.aiAnalysis);
+      show('apivuln-results', html);
+    })
+    .catch(function(e) { show('apivuln-results', '<p style="color:#ef4444">Error: ' + e.message + '</p>'); });
+}

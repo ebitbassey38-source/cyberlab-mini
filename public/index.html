@@ -29,6 +29,7 @@
     <button class="tab" id="tab-btn-hash" onclick="switchTab('hash')">🔐 Hash Tools</button>
     <button class="tab" id="tab-btn-network" onclick="switchTab('network')">🌐 Network Recon</button>
     <button class="tab" id="tab-btn-takeover" onclick="switchTab('takeover')">💀 Takeover</button>
+    <button class="tab" id="tab-btn-apivuln" onclick="switchTab('apivuln')">🔌 API Vuln</button>
   </div>
 
   <main class="main">
@@ -106,6 +107,14 @@
       <div id="network-results"></div>
     </section>
 
+    <section id="tab-apivuln" class="tab-content">
+      <div class="form-group">
+        <label>Target URL</label>
+        <input type="text" id="apivuln-target" placeholder="https://example.com"/>
+      </div>
+      <button class="btn-primary" onclick="runApiVuln()">🔌 Scan API Vulnerabilities</button>
+      <div id="apivuln-results"></div>
+    </section>
     <section id="tab-takeover" class="tab-content">
       <div class="form-group">
         <label>Target Domain</label>
